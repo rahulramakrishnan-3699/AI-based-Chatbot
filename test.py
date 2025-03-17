@@ -7,6 +7,7 @@ from sklearn.neighbors import NearestNeighbors
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import streamlit as st
 
 nlp = spacy.load('en_core_web_sm')
 
@@ -85,26 +86,29 @@ def get_recommendations(user_id, category = None, budget= None):
     product_id = category_products.sort_values(by="rating", ascending = False)['product_id'].iloc[0]
     return get_similar_products(product_id, top_n = 5)
 
-def chatbot_response(user_id, user_input):
+st.title("AI Chatbot for Product Recomenndations")
+st.write("Type your query below to get product suggestions")
+
+if "messages" not in st.session_state:
+    st.session_state.messages=[]
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
+
+user_input = st.chat_input("Ask me anything...")
+if user_input:
+    user_id = np.random.choice(user_item_matrix.index)
     category, budget = extract_keywords(user_input)
-    recommendations = get_recommendations(user_id, category, budget)
+    recommendations = get_recommendations (user_id, category, budget)
 
     if not recommendations:
-        return "I couldnt find any suitable recommendations. Try asking for another category !"
-    return f" Here are some {category if category else 'top'} recommendations{f'under ${budget}' if budget else ''}: {', '.join(recommendations)}"
+        chatbot_response = "I couldnt find any recommendations. Try asking for another query!"
+    else:
+        chatbot_response = f"Here are some {category if category else 'top'} recommendations{f'under ${budget}' if budget else ''}: {', '.join(recommendations)}"
 
-user_id = np.random.choice(user_item_matrix.index)
+    st.session_state.messages.append({"role":"user", "content":user_input})
+    st.session_state.messages.append({"role":"assistant", "content": chatbot_response})
 
-user_queries = [
-    "Can you recommend a laptop below $1000",
-    "I need a phone below $500.",
-    "Suggest some headphones",
-    "What are the best smartwatches?"
-    "Show me something new."
-]
-
-for query in user_queries:
-    category, budget = extract_keywords(query)
-    print(f"User Query: {query}")
-    print(f"Chatbot: {chatbot_response(user_id, query)}")
-    print("-" * 50)
+    with st.chat_message("assistant"):
+        st.write(chatbot_response)
