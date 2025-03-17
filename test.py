@@ -44,6 +44,7 @@ def extract_keywords(user_input):
     doc = nlp(user_input.lower())
     category = None
     budget = None
+    show_ids = False
     for token in doc:
         if token.text in product_categories:
             category = token.text
@@ -52,7 +53,10 @@ def extract_keywords(user_input):
     if budget_match:
         budget = int(budget_match.group(1))*(1000 if 'k' in user_input else 1)
 
-    return category,budget
+    if "id" in user_input.lower() or "product code" in user_input.lower():
+        show_ids= True
+
+    return category,budget, show_ids
 
 def get_knn_recommendations(user_id):
     user_index = np.random.choice(user_item_matrix.shape[0])  # Selects a row index
@@ -66,7 +70,7 @@ def get_knn_recommendations(user_id):
 
     return recommended_products.tolist()
 
-def get_similar_products(product_id, top_n=3):
+def get_similar_products(product_id, user_id, top_n=3):
     if product_id in product_similarity_df.index:
         return [p for p in product_similarity_df[product_id].sort_values(ascending=False).index[1:top_n+1] 
                 if p in user_item_matrix.columns and user_item_matrix.loc[user_id, p] == 0]
@@ -84,8 +88,21 @@ def get_recommendations(user_id, category = None, budget= None):
         return get_knn_recommendations(user_id)
     
     product_id = category_products.sort_values(by="rating", ascending = False)['product_id'].iloc[0]
-    return get_similar_products(product_id, top_n = 5)
+    return get_similar_products(product_id, user_id,  top_n = 5)
 
+def get_product_details(product_ids, show_ids = False):
+    details=[]
+    for product_id in product_ids:
+        product= product_data[product_data['product_id'] == product_id]
+        if not product.empty:
+            name = product['product_name'].values[0]
+            price = product['discounted_price'].values[0]
+            if show_ids:
+                details.append(f"{name} - ${price} (ID: {product_id})")
+            else:
+                details.append(f"{name} - ${price}")
+    return details 
+    
 st.title("AI Chatbot for Product Recomenndations")
 st.write("Type your query below to get product suggestions")
 
@@ -98,14 +115,18 @@ for message in st.session_state.messages:
 
 user_input = st.chat_input("Ask me anything...")
 if user_input:
+    st.session_state.messages.append({"role":"user", "content": user_input})
     user_id = np.random.choice(user_item_matrix.index)
-    category, budget = extract_keywords(user_input)
+    category, budget, show_ids = extract_keywords(user_input)
     recommendations = get_recommendations (user_id, category, budget)
 
     if not recommendations:
         chatbot_response = "I couldnt find any recommendations. Try asking for another query!"
     else:
-        chatbot_response = f"Here are some {category if category else 'top'} recommendations{f'under ${budget}' if budget else ''}: {', '.join(recommendations)}"
+        product_details = get_product_details(recommendations, show_ids)
+        if product_details:
+            recommendations_text = "\n".join([f"-{product}" for product in product_details])
+            chatbot_response = f"Here are some {category if category else 'top'} recommendations{f'under ${budget}' if budget else ''}: {', '.join(product_details)}"
 
     st.session_state.messages.append({"role":"user", "content":user_input})
     st.session_state.messages.append({"role":"assistant", "content": chatbot_response})
