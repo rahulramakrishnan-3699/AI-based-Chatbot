@@ -116,6 +116,9 @@ for message in st.session_state.messages:
 user_input = st.chat_input("Ask me anything...")
 if user_input:
     st.session_state.messages.append({"role":"user", "content": user_input})
+    with st.chat_message("user"):
+        st.write(user_input)
+        
     user_id = np.random.choice(user_item_matrix.index)
     category, budget, show_ids = extract_keywords(user_input)
     recommendations = get_recommendations (user_id, category, budget)
@@ -125,11 +128,11 @@ if user_input:
     else:
         product_details = get_product_details(recommendations, show_ids)
         if product_details:
-            recommendations_text = "\n".join([f"-{product}" for product in product_details])
-            chatbot_response = f"Here are some {category if category else 'top'} recommendations{f'under ${budget}' if budget else ''}: {', '.join(product_details)}"
+            recommendations_text = "\n".join([f" - {product}" for product in product_details])
+            chatbot_response = f"Here are some {category if category else 'top'} recommendations{f'under ${budget}' if budget else ''}:\n\n{recommendations_text}"
 
     st.session_state.messages.append({"role":"user", "content":user_input})
     st.session_state.messages.append({"role":"assistant", "content": chatbot_response})
-
+ 
     with st.chat_message("assistant"):
-        st.write(chatbot_response)
+        st.markdown(chatbot_response, unsafe_allow_html = True)
